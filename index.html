@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>사물 이야기 숏폼</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#fff8ef;--card:#ffffff;--ink:#3a2e2a;--sub:#8a7a72;--main:#ff7a59;--main2:#ffb347;--line:#f0e2d6}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Jua',sans-serif;padding:16px;padding-bottom:60px}
+  .wrap{max-width:480px;margin:0 auto}
+  h1{text-align:center;font-size:28px;margin:8px 0 4px}
+  .lead{text-align:center;color:var(--sub);margin:0 0 18px;font-size:15px}
+  .card{background:var(--card);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(120,80,40,.08)}
+  .step{font-size:18px;margin:0 0 12px}
+  .photo-btn{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;border:3px dashed var(--line);border-radius:16px;min-height:200px;cursor:pointer;color:var(--sub);font-size:17px;overflow:hidden}
+  .photo-btn img{width:100%;max-height:320px;object-fit:contain;display:block}
+  .photo-btn input{display:none}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{flex:1;min-width:70px;padding:12px 6px;border-radius:14px;border:2px solid var(--line);background:#fff;font-family:inherit;font-size:16px;color:var(--ink);cursor:pointer}
+  .chip.on{border-color:var(--main);background:#fff1ec;color:var(--main)}
+  .btn{width:100%;padding:16px;border:none;border-radius:16px;font-family:inherit;font-size:19px;color:#fff;background:linear-gradient(135deg,var(--main),var(--main2));cursor:pointer;margin-top:6px}
+  .btn:disabled{opacity:.5}
+  .btn.ghost{background:#fff;color:var(--main);border:2px solid var(--main)}
+  .btn.big{font-size:21px;padding:18px}
+  .row{display:flex;gap:8px}
+  .row .btn{font-size:16px;padding:14px 8px}
+  .status{text-align:center;color:var(--main);min-height:22px;margin:10px 0;font-size:17px}
+  .canvas-box{display:flex;justify-content:center}
+  canvas{width:100%;max-width:340px;aspect-ratio:9/16;border-radius:18px;background:#222;display:block}
+  .story-title{width:100%;font-family:inherit;font-size:19px;border:2px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;color:var(--ink)}
+  .line-in{width:100%;font-family:inherit;font-size:16px;border:2px solid var(--line);border-radius:12px;padding:10px;margin-bottom:6px;color:var(--ink)}
+  .hint{font-size:13px;color:var(--sub);margin:8px 0 0;line-height:1.5;text-align:center}
+  .small-link{display:block;text-align:center;color:var(--sub);font-size:14px;margin-top:10px}
+  .voice{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;color:var(--sub);margin-top:10px}
+  details summary{cursor:pointer;font-size:17px}
+  .hidden{display:none !important}
+  .spin{display:inline-block;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📷 사물 이야기 숏폼 🎬</h1>
+  <p class="lead">사물을 찍으면 AI가 15초 이야기 영상을 만들어 줘요</p>
+
+  <div id="makeArea">
+    <div class="card">
+      <p class="step">① 사물 사진 찍기</p>
+      <label class="photo-btn">
+        <span id="photoText" style="font-size:44px">📸</span>
+        <span id="photoText2">여기를 눌러 사진 찍기</span>
+        <img id="photoPrev" class="hidden" alt="">
+        <input type="file" id="photoIn" accept="image/*" capture="environment">
+      </label>
+    </div>
+
+    <div class="card">
+      <p class="step">② 이야기 분위기 고르기</p>
+      <div class="chips" id="genres">
+        <button class="chip on" data-g="동화" type="button">🧚 동화</button>
+        <button class="chip" data-g="모험" type="button">🗺️ 모험</button>
+        <button class="chip" data-g="코믹" type="button">😂 코믹</button>
+        <button class="chip" data-g="감동" type="button">💗 감동</button>
+      </div>
+      <label class="voice"><input type="checkbox" id="voiceOn" checked> 🔊 목소리로 읽어주기</label>
+    </div>
+
+    <button class="btn big" id="makeBtn" type="button">✨ 이야기 영상 만들기</button>
+  </div>
+
+  <p class="status" id="status"></p>
+
+  <div id="result" class="hidden">
+    <div class="card">
+      <div class="canvas-box"><canvas id="cv" width="720" height="1280"></canvas></div>
+      <button class="btn big" id="saveBtn" type="button" disabled>📱 내 폰에 저장하기</button>
+      <a id="dlLink" class="small-link hidden" download>저장이 안 되면 여기를 눌러 파일로 받기</a>
+      <div class="row">
+        <button class="btn ghost" id="replayBtn" type="button">▶ 다시 보기</button>
+        <button class="btn ghost" id="againBtn" type="button">📸 새로 찍기</button>
+      </div>
+      <p class="hint">아이폰: 저장하기 → <b>'동영상 저장'</b>을 누르면 사진첩에 들어가요<br>안드로이드: 저장하기 → 갤러리나 파일에 저장</p>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>✏️ 이야기 글자 고치기</summary>
+        <div style="margin-top:12px">
+          <input id="titleIn" class="story-title">
+          <div id="linesBox"></div>
+          <p class="hint">고친 뒤 '내 폰에 저장하기'를 누르면 고친 내용으로 다시 만들어요.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const W = 720, H = 1280, DUR = 15, SCENES = 4, SD = DUR / SCENES;
+const cv = $('cv'), ctx = cv.getContext('2d');
+let photo = null, photoB64 = '', genre = '동화', story = null;
+let raf = null, ac = null, musicMaster = null;
+let videoFile = null, dirty = false, busy = false;
+
+function setStatus(t){ $('status').innerHTML = t; }
+
+// ---------- 사진 ----------
+$('photoIn').onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const s = Math.min(1, 1024 / Math.max(im.width, im.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      const url = c.toDataURL('image/jpeg', 0.85);
+      photoB64 = url.split(',')[1];
+      photo = new Image(); photo.src = url;
+      $('photoPrev').src = url;
+      $('photoPrev').classList.remove('hidden');
+      $('photoText').classList.add('hidden');
+      $('photoText2').classList.add('hidden');
+      setStatus('');
+    };
+    im.src = r.result;
+  };
+  r.readAsDataURL(f);
+};
+
+// ---------- 장르 ----------
+document.querySelectorAll('#genres .chip').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#genres .chip').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); genre = b.dataset.g;
+});
+
+// ---------- 모바일 소리 잠금 해제 ----------
+function unlockAudio(){
+  if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  if(ac.state === 'suspended') ac.resume();
+  try{ speechSynthesis.speak(new SpeechSynthesisUtterance('')); }catch(e){}
+}
+
+// ---------- 서버에 이야기 요청 ----------
+async function askStory(){
+  const res = await fetch('/api/story', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: photoB64, genre })
+  });
+  const j = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error(j.error || ('오류 ' + res.status));
+  return j;
+}
+
+// ---------- 만들기 ----------
+$('makeBtn').onclick = async () => {
+  if(busy) return;
+  unlockAudio();
+  if(!photo){ setStatus('📸 먼저 사진을 찍어 주세요'); return; }
+  busy = true; $('makeBtn').disabled = true;
+  setStatus('<span class="spin">✨</span> AI가 사진을 보고 이야기를 쓰는 중...');
+  try{
+    story = await askStory();
+    await document.fonts.load('48px Jua');
+    fillEditor();
+    $('makeArea').classList.add('hidden');
+    $('result').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await makeVideo();
+  }catch(e){
+    setStatus('😢 ' + e.message);
+  }
+  busy = false; $('makeBtn').disabled = false;
+};
+
+// 15초 재생하면서 동시에 녹화
+async function makeVideo(){
+  videoFile = null; dirty = false;
+  $('saveBtn').disabled = true; $('replayBtn').disabled = true; $('againBtn').disabled = true;
+  $('dlLink').classList.add('hidden');
+  if(!cv.captureStream || !window.MediaRecorder){
+    setStatus('이 브라우저는 영상 저장을 지원하지 않아요. 미리보기만 볼 수 있어요.');
+    play();
+    $('replayBtn').disabled = false; $('againBtn').disabled = false;
+    return;
+  }
+  setStatus('🔴 영상 만드는 중... 15초만 기다려 주세요 (화면을 끄지 마세요)');
+  const blob = await recordPlay();
+  const type = blob.type || 'video/mp4';
+  const ext = type.includes('mp4') ? 'mp4' : 'webm';
+  const name = (story.title || '사물이야기').replace(/[\\/:*?"<>|]/g, '') + '.' + ext;
+  videoFile = new File([blob], name, { type });
+  $('dlLink').href = URL.createObjectURL(blob);
+  $('dlLink').download = name;
+  $('dlLink').classList.remove('hidden');
+  $('saveBtn').disabled = false; $('replayBtn').disabled = false; $('againBtn').disabled = false;
+  setStatus('✅ 완성! 아래 버튼을 눌러 내 폰에 저장하세요');
+}
+
+function recordPlay(){
+  return new Promise(resolve => {
+    const dest = ac.createMediaStreamDestination();
+    const stream = cv.captureStream(30);
+    dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+    const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+    const mime = types.find(m => MediaRecorder.isTypeSupported(m)) || '';
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 4000000 } : {});
+    const chunks = [];
+    rec.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+    rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || mime || 'video/webm' }));
+    rec.start(250);
+    play(() => setTimeout(() => rec.stop(), 300), [dest]);
+  });
+}
+
+// ---------- 저장 ----------
+$('saveBtn').onclick = async () => {
+  if(busy) return;
+  if(dirty || !videoFile){
+    busy = true; unlockAudio();
+    await makeVideo();
+    busy = false;
+    setStatus('✅ 고친 내용으로 다시 만들었어요! 저장 버튼을 한 번 더 눌러 주세요');
+    return;
+  }
+  if(navigator.canShare && navigator.canShare({ files: [videoFile] })){
+    try{
+      await navigator.share({ files: [videoFile], title: story.title });
+      setStatus('🎉 저장 완료!');
+    }catch(e){
+      if(e.name !== 'AbortError') $('dlLink').click();
+    }
+  }else{
+    $('dlLink').click();
+    setStatus('⬇️ 다운로드 폴더(파일)에 저장됐어요');
+  }
+};
+
+$('replayBtn').onclick = () => { if(busy) return; unlockAudio(); play(); };
+
+$('againBtn').onclick = () => {
+  if(busy) return;
+  cancelAnimationFrame(raf); stopMusic();
+  try{ speechSynthesis.cancel(); }catch(e){}
+  photo = null; photoB64 = ''; story = null; videoFile = null;
+  $('photoIn').value = '';
+  $('photoPrev').classList.add('hidden');
+  $('photoText').classList.remove('hidden');
+  $('photoText2').classList.remove('hidden');
+  $('result').classList.add('hidden');
+  $('makeArea').classList.remove('hidden');
+  setStatus('');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+function fillEditor(){
+  $('titleIn').value = story.title;
+  $('titleIn').oninput = () => { story.title = $('titleIn').value; dirty = true; };
+  $('linesBox').innerHTML = '';
+  story.lines.forEach((l, i) => {
+    const inp = document.createElement('input');
+    inp.className = 'line-in'; inp.value = l;
+    inp.oninput = () => { story.lines[i] = inp.value; dirty = true; };
+    $('linesBox').appendChild(inp);
+  });
+}
+
+// ---------- 그리기 ----------
+const MOVES = [
+  { z:[1.00,1.15], x:[0,0],        y:[0,-0.03] },
+  { z:[1.25,1.10], x:[-0.06,0.04], y:[0.02,0] },
+  { z:[1.10,1.30], x:[0.05,-0.03], y:[-0.04,0.02] },
+  { z:[1.30,1.05], x:[0,0],        y:[0.03,0] }
+];
+const COLORS = { '따뜻함':'255,214,120', '신남':'255,130,190', '신비':'160,205,255', '웃김':'255,240,110' };
+const parts = Array.from({ length: 45 }, () => ({ x: Math.random(), y: Math.random(), r: 2 + Math.random()*5, sp: 0.02 + Math.random()*0.05, ph: Math.random()*6.28 }));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t * t * (3 - 2 * t);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function drawPhoto(i, p, alpha){
+  const m = MOVES[i % 4], e = ease(p);
+  const sc = Math.max(W / photo.width, H / photo.height) * lerp(m.z[0], m.z[1], e);
+  const dw = photo.width * sc, dh = photo.height * sc;
+  const mx = (dw - W) / 2, my = (dh - H) / 2;
+  const ox = clamp(lerp(m.x[0], m.x[1], e) * W, -mx, mx);
+  const oy = clamp(lerp(m.y[0], m.y[1], e) * H, -my, my);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(photo, (W - dw) / 2 + ox, (H - dh) / 2 + oy, dw, dh);
+  ctx.globalAlpha = 1;
+}
+
+function wrap(text, maxW){
+  const out = []; let cur = '';
+  for(const ch of text){
+    if(ctx.measureText(cur + ch).width > maxW && cur){ out.push(cur); cur = ch.trim() ? ch : ''; }
+    else cur += ch;
+  }
+  if(cur) out.push(cur);
+  return out;
+}
+
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function draw(t){
+  const i = Math.min(SCENES - 1, Math.floor(t / SD));
+  const lp = t - i * SD, p = lp / SD;
+  ctx.clearRect(0, 0, W, H);
+  drawPhoto(i, p, 1);
+  if(i < SCENES - 1 && SD - lp < 0.5) drawPhoto(i + 1, 0, 1 - (SD - lp) / 0.5);
+  // 비네팅
+  const g = ctx.createRadialGradient(W/2, H/2, H*0.25, W/2, H/2, H*0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 반짝이
+  const col = COLORS[story.mood] || COLORS['따뜻함'];
+  parts.forEach(q => {
+    const y = ((q.y - t * q.sp) % 1 + 1) % 1;
+    ctx.fillStyle = `rgba(${col},${0.35 + 0.35 * Math.sin(t * 3 + q.ph)})`;
+    ctx.beginPath(); ctx.arc(q.x * W + Math.sin(t + q.ph) * 12, y * H, q.r, 0, 6.28); ctx.fill();
+  });
+  // 제목
+  if(t < 3){
+    ctx.globalAlpha = t < 0.5 ? t / 0.5 : (t > 2.5 ? (3 - t) / 0.5 : 1);
+    ctx.font = '68px Jua'; ctx.textAlign = 'center';
+    ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.strokeText(story.title, W/2, 200);
+    ctx.fillStyle = '#fff'; ctx.fillText(story.title, W/2, 200);
+    ctx.globalAlpha = 1;
+  }
+  // 자막
+  const line = story.lines[i] || '';
+  if(line){
+    const a = Math.min(1, lp / 0.35), rise = (1 - a) * 20;
+    ctx.font = '50px Jua'; ctx.textAlign = 'center';
+    const rows = wrap(line, W - 140);
+    const lh = 66, boxH = rows.length * lh + 40, by = H - 230 - boxH / 2 + rise;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; roundRect(50, by, W - 100, boxH, 28); ctx.fill();
+    ctx.fillStyle = '#fff';
+    rows.forEach((r, k) => ctx.fillText(r, W/2, by + 20 + lh * (k + 0.75)));
+    ctx.globalAlpha = 1;
+  }
+  // 끝
+  if(t > DUR - 1.2){
+    const a = (t - (DUR - 1.2)) / 1.2;
+    ctx.fillStyle = `rgba(0,0,0,${a * 0.4})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = a; ctx.font = '56px Jua'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    ctx.fillText('끝 ✨', W/2, H/2); ctx.globalAlpha = 1;
+  }
+}
+
+// ---------- 배경음악 (브라우저에서 직접 합성) ----------
+function startMusic(outs){
+  stopMusic();
+  const now = ac.currentTime + 0.05;
+  const master = ac.createGain();
+  outs.forEach(o => master.connect(o));
+  master.gain.setValueAtTime(0, now);
+  master.gain.linearRampToValueAtTime(0.16, now + 1);
+  master.gain.setValueAtTime(0.16, now + DUR - 1.5);
+  master.gain.linearRampToValueAtTime(0, now + DUR);
+  const S = { '따뜻함':{root:60,minor:false,bpm:84}, '신남':{root:62,minor:false,bpm:124}, '신비':{root:57,minor:true,bpm:72}, '웃김':{root:65,minor:false,bpm:136} }[story.mood] || {root:60,minor:false,bpm:90};
+  const scale = S.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11];
+  const prog = S.minor ? [0,5,2,6] : [0,4,5,3];
+  const note = d => S.root + 12 * Math.floor(d / 7) + scale[((d % 7) + 7) % 7];
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  const tone = (freq, t0, len, vol, type) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.3, len * 0.3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + len + 0.05);
+  };
+  prog.forEach((d, c) => {
+    const t0 = now + c * SD;
+    [d, d + 2, d + 4].forEach(x => tone(hz(note(x) - 12), t0, SD + 0.3, 0.12, 'sine'));
+    const step = 60 / S.bpm / 2;
+    for(let k = 0, tt = t0; tt < t0 + SD - 0.05; k++, tt += step){
+      tone(hz(note([d, d + 2, d + 4, d + 7][k % 4]) + 12), tt, step * 1.6, 0.07, 'triangle');
+    }
+  });
+  musicMaster = master;
+}
+function stopMusic(){
+  if(musicMaster){ try{ musicMaster.disconnect(); }catch(e){} musicMaster = null; }
+}
+
+// ---------- 목소리 ----------
+function speak(text){
+  if(!$('voiceOn').checked || !text || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ko-KR'; u.rate = 1.1; u.pitch = 1.1;
+  const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.startsWith('ko'));
+  if(v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+// ---------- 재생 ----------
+function play(onEnd, extraOuts){
+  cancelAnimationFrame(raf);
+  try{ speechSynthesis.cancel(); }catch(e){}
+  unlockAudio();
+  startMusic([ac.destination].concat(extraOuts || []));
+  const start = performance.now();
+  let last = -1;
+  const loop = now => {
+    const t = (now - start) / 1000;
+    if(t >= DUR){ draw(DUR - 0.001); if(onEnd) onEnd(); return; }
+    draw(t);
+    const sc = Math.min(SCENES - 1, Math.floor(t / SD));
+    if(sc !== last){ last = sc; speak(story.lines[sc]); }
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
