@@ -64,7 +64,6 @@
         <button class="chip" data-g="코믹" type="button">😂 코믹</button>
         <button class="chip" data-g="감동" type="button">💗 감동</button>
       </div>
-      <label class="voice"><input type="checkbox" id="voiceOn" checked> 🔊 목소리로 읽어주기</label>
     </div>
 
     <button class="btn big" id="makeBtn" type="button">✨ 이야기 영상 만들기</button>
@@ -104,6 +103,8 @@ const cv = $('cv'), ctx = cv.getContext('2d');
 let photo = null, photoB64 = '', genre = '동화', story = null;
 let raf = null, ac = null, musicMaster = null;
 let videoFile = null, dirty = false, busy = false;
+const bounds = [0, SD, 2 * SD, 3 * SD, DUR];     // 장면이 바뀌는 시점
+function sceneAt(t){ let i = 0; while(i < SCENES - 1 && t >= bounds[i + 1]) i++; return i; }
 
 function setStatus(t){ $('status').innerHTML = t; }
 
@@ -142,7 +143,6 @@ document.querySelectorAll('#genres .chip').forEach(b => b.onclick = () => {
 function unlockAudio(){
   if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
   if(ac.state === 'suspended') ac.resume();
-  try{ speechSynthesis.speak(new SpeechSynthesisUtterance('')); }catch(e){}
 }
 
 // ---------- 서버에 이야기 요청 ----------
@@ -246,7 +246,6 @@ $('replayBtn').onclick = () => { if(busy) return; unlockAudio(); play(); };
 $('againBtn').onclick = () => {
   if(busy) return;
   cancelAnimationFrame(raf); stopMusic();
-  try{ speechSynthesis.cancel(); }catch(e){}
   photo = null; photoB64 = ''; story = null; videoFile = null;
   $('photoIn').value = '';
   $('photoPrev').classList.add('hidden');
@@ -312,11 +311,12 @@ function roundRect(x, y, w, h, r){
 }
 
 function draw(t){
-  const i = Math.min(SCENES - 1, Math.floor(t / SD));
-  const lp = t - i * SD, p = lp / SD;
+  const i = sceneAt(t);
+  const sd = bounds[i + 1] - bounds[i];
+  const lp = t - bounds[i], p = Math.min(1, lp / sd);
   ctx.clearRect(0, 0, W, H);
   drawPhoto(i, p, 1);
-  if(i < SCENES - 1 && SD - lp < 0.5) drawPhoto(i + 1, 0, 1 - (SD - lp) / 0.5);
+  if(i < SCENES - 1 && sd - lp < 0.5) drawPhoto(i + 1, 0, 1 - (sd - lp) / 0.5);
   // 비네팅
   const g = ctx.createRadialGradient(W/2, H/2, H*0.25, W/2, H/2, H*0.75);
   g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -366,8 +366,9 @@ function startMusic(outs){
   const master = ac.createGain();
   outs.forEach(o => master.connect(o));
   master.gain.setValueAtTime(0, now);
-  master.gain.linearRampToValueAtTime(0.16, now + 1);
-  master.gain.setValueAtTime(0.16, now + DUR - 1.5);
+  const vol = 0.18;
+  master.gain.linearRampToValueAtTime(vol, now + 1);
+  master.gain.setValueAtTime(vol, now + DUR - 1.5);
   master.gain.linearRampToValueAtTime(0, now + DUR);
   const S = { '따뜻함':{root:60,minor:false,bpm:84}, '신남':{root:62,minor:false,bpm:124}, '신비':{root:57,minor:true,bpm:72}, '웃김':{root:65,minor:false,bpm:136} }[story.mood] || {root:60,minor:false,bpm:90};
   const scale = S.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11];
@@ -396,30 +397,17 @@ function stopMusic(){
   if(musicMaster){ try{ musicMaster.disconnect(); }catch(e){} musicMaster = null; }
 }
 
-// ---------- 목소리 ----------
-function speak(text){
-  if(!$('voiceOn').checked || !text || !window.speechSynthesis) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'ko-KR'; u.rate = 1.1; u.pitch = 1.1;
-  const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.startsWith('ko'));
-  if(v) u.voice = v;
-  speechSynthesis.speak(u);
-}
-
 // ---------- 재생 ----------
 function play(onEnd, extraOuts){
   cancelAnimationFrame(raf);
-  try{ speechSynthesis.cancel(); }catch(e){}
   unlockAudio();
-  startMusic([ac.destination].concat(extraOuts || []));
+  const outs = [ac.destination].concat(extraOuts || []);
+  startMusic(outs);
   const start = performance.now();
-  let last = -1;
   const loop = now => {
     const t = (now - start) / 1000;
     if(t >= DUR){ draw(DUR - 0.001); if(onEnd) onEnd(); return; }
     draw(t);
-    const sc = Math.min(SCENES - 1, Math.floor(t / SD));
-    if(sc !== last){ last = sc; speak(story.lines[sc]); }
     raf = requestAnimationFrame(loop);
   };
   raf = requestAnimationFrame(loop);
