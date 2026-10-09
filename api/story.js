@@ -3,7 +3,9 @@
 
 const GENRES = ['동화', '모험', '코믹', '감동'];
 const MOODS = ['따뜻함', '신남', '신비', '웃김'];
-const MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+// 앞 모델이 바쁘면 다음 모델로 자동으로 넘어갑니다 (lite 모델은 덜 붐벼요)
+const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.0-flash'];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 가능해요' });
@@ -30,7 +32,9 @@ module.exports = async (req, res) => {
 JSON으로만 답하세요:
 {"object":"사물 이름","title":"제목","lines":["문장1","문장2","문장3","문장4"],"mood":"따뜻함, 신남, 신비, 웃김 중 하나"}`;
 
-  let lastErr = '';
+  let lastErr = '', busyCount = 0;
+  for (let round = 0; round < 2; round++) {
+  if (round > 0) await sleep(2000); // 전부 바쁘면 2초 쉬고 한 바퀴 더
   for (const m of MODELS) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
@@ -52,14 +56,20 @@ JSON으로만 답하세요:
       }
       lastErr = (j.error && j.error.message) || ('오류 ' + r.status);
       if (r.status === 404) continue; // 모델 이름이 없으면 다음 모델로
-      if (r.status === 429) return res.status(429).json({ error: '지금 사용하는 사람이 많아요. 30초 뒤에 다시 눌러 주세요.' });
+      if (r.status === 400 && /key/i.test(lastErr)) return res.status(400).json({ error: 'API 키가 올바르지 않아요. Vercel 환경변수를 확인해 주세요.' });
+      if (r.status === 429 || r.status >= 500) { busyCount++; continue; } // 바쁨/사용량 초과 → 다음 모델
       return res.status(r.status).json({ error: 'AI 오류: ' + lastErr });
     } catch (e) {
-      lastErr = e.message;
+      lastErr = e.message; // 응답이 이상해도 다음 모델로
     }
   }
+  }
+  if (busyCount) return res.status(503).json({ error: '지금 AI가 너무 바빠요. 30초쯤 뒤에 다시 눌러 주세요.' });
   return res.status(500).json({ error: 'AI 오류: ' + lastErr });
 };
+
+// 여러 모델을 시도할 시간을 넉넉히 (최대 60초)
+module.exports.config = { maxDuration: 60 };
 
 function parseStory(txt) {
   const clean = String(txt).replace(/```json|```/g, '').trim();
